@@ -11,14 +11,37 @@ namespace HuanL\Extend;
 class InsideHttpRequest {
 
     /**
-     * 启动的引导文件路径
+     * 启动操作
+     * @var mixed
+     */
+    protected $startAction;
+
+    /**
+     * 返回内容
      * @var string
      */
-    protected $start_file = '';
+    protected $responseContent = '';
 
-    public function __construct(string $start_file = '') {
-        $this->start_file = $start_file;
+    /**
+     * 返回头
+     * @var array
+     */
+    public static $responseHeader = [];
+
+    public function __construct($startAction = '') {
+        $this->startAction = $startAction;
         $_SERVER['SCRIPT_NAME'] = '';
+        $_SERVER['HTTP_HOST'] = '127.0.0.1';
+    }
+
+    /**
+     * 设置启动操作
+     * @param string $startAction
+     * @return $this
+     */
+    public function setStartAction( $startAction) {
+        $this->startAction = $startAction;
+        return $this;
     }
 
     /**
@@ -106,6 +129,7 @@ class InsideHttpRequest {
      */
     public function domain(string $domain) {
         $_SERVER['SERVER_NAME'] = $domain;
+        $_SERVER['HTTP_HOST'] = $domain;
         return $this;
     }
 
@@ -130,7 +154,78 @@ class InsideHttpRequest {
      * @return $this
      */
     public function request() {
-        require_once $this->start_file;
+        ob_start();
+        if (is_string($this->startAction)) {
+            require $this->startAction;
+        } else if ($this->startAction instanceof \Closure) {
+            call_user_func($this->startAction);
+        }
+        $this->responseContent = ob_get_clean();
         return $this;
+    }
+
+    /**
+     * 获取请求返回内容
+     * @return mixed
+     */
+    public function content() {
+        //根据contentType返回
+        $ret = $this->responseContent;
+        if (strpos($this->contentType(), 'json')) {
+            $ret = json_decode($ret, true);
+        }
+        return $ret;
+    }
+
+    /**
+     * 返回json数组对象
+     * @return array
+     */
+    public function json() {
+        return json_decode($this->responseContent, true);
+    }
+
+    public function contentType($type = '') {
+        if (empty($type)) {
+            //为空取content
+            foreach ($this->header() as $key => $value) {
+                if ($key == 'CONTENT_TYPE')
+                    return $value;
+            }
+            return '';
+        } else {
+            $_SERVER['CONTENT_TYPE'] = $type;
+        }
+    }
+
+    /**
+     * 获取返回code
+     * @return int
+     */
+    public function response_code() {
+        return http_response_code();
+    }
+
+    /**
+     * 获取/设置 头
+     * @param array $header
+     * @return $this|array
+     */
+    public function header($header = []) {
+        if (count($header) > 0) {
+            //参数不是空的,就是请求的header
+            //TODO:有特殊情况需要处理
+            $whitelist = ['CONTENT_TYPE'];
+            foreach ($header as $key => $value) {
+                $key = str_replace('-', '_', strtoupper($key));
+                if (!in_array($key, $whitelist)) {
+                    $key = 'HTTP_' . $key;
+                }
+                $_SERVER[$key] = $value;
+            }
+            return $this;
+        } else {
+            return array_merge(static::$responseHeader, headers_list());
+        }
     }
 }
