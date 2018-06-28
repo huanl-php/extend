@@ -39,7 +39,7 @@ class InsideHttpRequest {
      * @param string $startAction
      * @return $this
      */
-    public function setStartAction( $startAction) {
+    public function setStartAction($startAction) {
         $this->startAction = $startAction;
         return $this;
     }
@@ -227,5 +227,23 @@ class InsideHttpRequest {
         } else {
             return array_merge(static::$responseHeader, headers_list());
         }
+    }
+
+    /**
+     * 用于替换内置的header函数
+     * @param $header
+     * @param bool $replace
+     * @param int $code
+     */
+    public static function addHeader($header, $replace = true, $code = 200) {
+        $key = strtoupper(substr($header, 0, strpos($header, ':')));
+        foreach (static::$responseHeader as $k => $value) {
+            $tmpKey = strtoupper(substr($value, 0, strpos($value, ':')));
+            if ($tmpKey == $key) {
+                static::$responseHeader[$k] = $header;
+                return;
+            }
+        }
+        static::$responseHeader[] = $header;
     }
 }
